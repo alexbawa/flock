@@ -8,6 +8,12 @@ def create_app() -> Flask:
 
     _init_celery(app)
 
+    from app.db import close_db
+    app.teardown_appcontext(close_db)
+
+    from app.routes import jobs_bp
+    app.register_blueprint(jobs_bp)
+
     @app.get("/health")
     def health():
         return jsonify({"status": "ok"}), 200
