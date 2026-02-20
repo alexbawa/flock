@@ -1,8 +1,19 @@
+import logging
+from urllib.parse import urlparse
+
 from celery import Celery, Task
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
+
+logger = logging.getLogger(__name__)
 
 
 def create_app() -> Flask:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S",
+    )
+
     app = Flask(__name__)
     app.config.from_object("app.config.Config")
 
@@ -14,10 +25,16 @@ def create_app() -> Flask:
     from app.routes import jobs_bp
     app.register_blueprint(jobs_bp)
 
+    @app.after_request
+    def log_request(response):
+        logger.info("%s %s %s", request.method, request.path, response.status_code)
+        return response
+
     @app.get("/health")
     def health():
         return jsonify({"status": "ok"}), 200
 
+    logger.info("Flask app created")
     return app
 
 
@@ -35,4 +52,7 @@ def _init_celery(app: Flask) -> Celery:
     )
     celery_app.set_default()
     app.extensions["celery"] = celery_app
+
+    parsed = urlparse(app.config["REDIS_URL"])
+    logger.info("Celery initialized with broker %s://%s", parsed.scheme, parsed.hostname)
     return celery_app

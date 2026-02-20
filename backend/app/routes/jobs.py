@@ -1,12 +1,14 @@
 import json
+import logging
 import uuid
 
 from flask import Blueprint, jsonify, request
 
 from app.db import get_db
-from app.tasks import run_job
+from app.tasks import run_flock_job
 
 bp = Blueprint("jobs", __name__)
+logger = logging.getLogger(__name__)
 
 _TIME_WINDOW_FIELDS = (
     "outbound_departure_window",
@@ -53,7 +55,18 @@ def create_job():
     try:
         _validate_submission(data)
     except ValueError as e:
+        logger.warning("Validation failed: %s", e)
         return jsonify({"error": str(e)}), 400
+
+    travelers = data["travelers"]
+    destinations = data["destinations"]
+    logger.info(
+        "Job submission received: %d traveler(s), %d destination(s), %s -> %s",
+        len(travelers),
+        len(destinations),
+        data.get("outbound_date"),
+        data.get("return_date"),
+    )
 
     job_id = str(uuid.uuid4())
     db = get_db()
@@ -63,8 +76,11 @@ def create_job():
                 "insert into jobs (id, status, submission) values (%s, 'pending', %s)",
                 (job_id, json.dumps(data)),
             )
+    logger.info("Job %s written to database with status=pending", job_id)
 
-    run_job.delay(job_id)
+    run_flock_job.delay(job_id)
+    logger.info("Job %s enqueued", job_id)
+
     return jsonify({"job_id": job_id}), 201
 
 
@@ -79,6 +95,7 @@ def get_job(job_id: str):
         row = cur.fetchone()
 
     if row is None:
+        logger.warning("Job %s not found", job_id)
         return jsonify({"error": "Job not found"}), 404
 
     job_id_db, status, created_at, completed_at, error = row

@@ -169,3 +169,18 @@ REDIS_URL
 - Job results are stored as a single JSONB blob — no normalization needed at this stage
 - No authentication — this is a personal tool
 - No destination ranking or flagging at this stage — raw data is surfaced to the frontend as-is
+- `excludedAirlineCodes` is only passed to Amadeus when the list is non-empty — passing an empty string is invalid
+- Destinations are excluded from results if any single traveler has no valid flight after filtering (the group can't all go there)
+- Per-leg `price` on `FlightOption` = `total_price / 2` — Amadeus does not break down pricing per leg in the Flight Offers Search response; `total_price` on `TravelerFlight` is the authoritative figure
+- Cheapest offer is selected per traveler × destination after post-response filtering
+- Destination city names are resolved via `client.reference_data.locations.get(keyword=iata, subType='AIRPORT')` with fallback to the raw IATA code
+
+## Conventions
+
+### Database migrations
+Every schema change requires a **new migration file** — never edit an existing one. Files live in `supabase/migrations/` and are named `NNNN_description.sql` (e.g. `0002_results_job_id_primary_key.sql`).
+
+### Logging
+- Never log credentials, passwords, or full connection URLs (they contain passwords). Use `urlparse` to log only `scheme://hostname`.
+- Use `%s`-style format strings in all `logger.*()` calls (lazy evaluation — string is not formatted if the level is suppressed).
+- Use `logger.exception()` inside `except` blocks to capture the full stack trace automatically.
