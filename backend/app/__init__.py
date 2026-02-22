@@ -3,6 +3,7 @@ from urllib.parse import urlparse
 
 from celery import Celery, Task
 from flask import Flask, jsonify, request
+from flask_cors import CORS
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,8 @@ def create_app() -> Flask:
 
     app = Flask(__name__)
     app.config.from_object("app.config.Config")
+
+    CORS(app)
 
     _init_celery(app)
 

@@ -1,7 +1,9 @@
 import type { JobResult, TripSubmission } from '../types'
 
+const BASE_URL = import.meta.env.VITE_API_URL ?? ''
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, init)
+  const res = await fetch(`${BASE_URL}${path}`, init)
   if (!res.ok) {
     const text = await res.text()
     throw new Error(`${res.status} ${res.statusText}: ${text}`)
